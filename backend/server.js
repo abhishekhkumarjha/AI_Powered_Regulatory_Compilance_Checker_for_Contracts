@@ -15,6 +15,18 @@ import {
 import { analyzeWithLocalModel } from "./pythonAnalyzer.js";
 
 const app = express();
+const app = express();
+
+import cors from "cors";
+
+app.use(cors({
+  origin: configuredOrigins.length ? configuredOrigins : "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+}));
+
+app.use(express.json());
 const port = Number(process.env.PORT || process.env.BACKEND_PORT || 4000);
 const configuredOrigins = [
   process.env.FRONTEND_ORIGIN,
