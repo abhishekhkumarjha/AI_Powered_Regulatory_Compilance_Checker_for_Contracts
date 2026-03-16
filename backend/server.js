@@ -15,7 +15,6 @@ import {
 import { analyzeWithLocalModel } from "./pythonAnalyzer.js";
 
 const app = express();
-const app = express();
 
 import cors from "cors";
 
