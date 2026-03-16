@@ -1,5 +1,6 @@
 import "dotenv/config";
 import crypto from "node:crypto";
+import cors from "cors";
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
@@ -15,17 +16,6 @@ import {
 import { analyzeWithLocalModel } from "./pythonAnalyzer.js";
 
 const app = express();
-
-import cors from "cors";
-
-app.use(cors({
-  origin: configuredOrigins.length ? configuredOrigins : "*",
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true
-}));
-
-app.use(express.json());
 const port = Number(process.env.PORT || process.env.BACKEND_PORT || 4000);
 const configuredOrigins = [
   process.env.FRONTEND_ORIGIN,
@@ -67,26 +57,26 @@ const recordActivity = ({ contractId = null, userId, action, details = {} }) => 
 const canAccessContract = (actor, ownerId) =>
   actor.role === "Admin" || actor.role === "Legal Reviewer" || actor.id === ownerId;
 
-app.use(express.json({ limit: "35mb" }));
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  const isAllowedOrigin =
-    origin &&
-    (configuredOrigins.includes(origin) ||
-      origin.startsWith("http://localhost") ||
-      origin.startsWith("http://127.0.0.1"));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (
+        !origin ||
+        configuredOrigins.includes(origin) ||
+        origin.startsWith("http://localhost") ||
+        origin.startsWith("http://127.0.0.1")
+      ) {
+        return callback(null, true);
+      }
 
-  // Reflect trusted origins so credentialed browser requests keep working in production.
-  if (isAllowedOrigin) {
-    res.header("Access-Control-Allow-Origin", origin);
-    res.header("Vary", "Origin");
-  }
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Credentials", "true");
-  if (req.method === "OPTIONS") return res.sendStatus(204);
-  next();
-});
+      return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: "35mb" }));
 
 app.get("/api/health", (_req, res) => {
   res.json({
