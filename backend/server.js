@@ -37,6 +37,21 @@ const isUniqueConstraintError = (error) =>
   error?.code === "SQLITE_CONSTRAINT_UNIQUE" ||
   String(error?.message || "").toUpperCase().includes("UNIQUE CONSTRAINT FAILED");
 
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  if (configuredOrigins.includes(origin)) return true;
+  if (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) {
+    return true;
+  }
+
+  try {
+    const { protocol, hostname } = new URL(origin);
+    return protocol === "https:" && hostname.endsWith(".vercel.app");
+  } catch {
+    return false;
+  }
+};
+
 const requireRole = (...roles) => (req, res, next) => {
   if (!req.auth?.user || !roles.includes(req.auth.user.role)) {
     return res.status(403).json({ error: "Forbidden" });
@@ -60,12 +75,7 @@ const canAccessContract = (actor, ownerId) =>
 app.use(
   cors({
     origin(origin, callback) {
-      if (
-        !origin ||
-        configuredOrigins.includes(origin) ||
-        origin.startsWith("http://localhost") ||
-        origin.startsWith("http://127.0.0.1")
-      ) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
 
