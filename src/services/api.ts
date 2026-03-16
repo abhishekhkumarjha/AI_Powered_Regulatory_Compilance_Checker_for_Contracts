@@ -1,4 +1,4 @@
-export const API_BASE = import.meta.env.VITE_API_URL || '';
+import { apiUrl } from '../config/api';
 
 export const authFetch = async (path: string, init: RequestInit = {}) => {
   const token = localStorage.getItem('auth_token');
@@ -12,7 +12,7 @@ export const authFetch = async (path: string, init: RequestInit = {}) => {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     headers,
   });

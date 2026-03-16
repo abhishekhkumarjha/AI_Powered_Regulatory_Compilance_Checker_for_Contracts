@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiUrl, describeApiTarget } from '../config/api';
 import { User, Role } from '../types';
 
 interface AuthContextType {
@@ -12,8 +13,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
-console.log('API_BASE configured as:', API_BASE);
+console.log('API target configured as:', describeApiTarget());
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -31,7 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/auth/me`, {
+      const response = await fetch(apiUrl('/api/auth/me'), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -55,12 +55,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string, role?: Role) => {
     setIsLoading(true);
     try {
-      const url = `${API_BASE}/api/auth/signin`;
+      const url = apiUrl('/api/auth/signin');
       console.log('Login request to:', url);
       const response = await fetch(url, {
         method: 'POST',
-        mode: 'cors',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -88,6 +86,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       setIsLoading(false);
       console.error('Login error:', error);
+      if (error instanceof TypeError) {
+        throw new Error('Cannot reach the server. Start the backend and try again.');
+      }
       throw error;
     }
   };
@@ -95,12 +96,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signup = async (name: string, email: string, password: string, role: Role = 'Client') => {
     setIsLoading(true);
     try {
-      const url = `${API_BASE}/api/auth/signup`;
+      const url = apiUrl('/api/auth/signup');
       console.log('Signup request to:', url);
       const response = await fetch(url, {
         method: 'POST',
-        mode: 'cors',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -128,6 +127,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       setIsLoading(false);
       console.error('Signup error:', error);
+      if (error instanceof TypeError) {
+        throw new Error('Cannot reach the server. Start the backend and try again.');
+      }
       throw error;
     }
   };
@@ -136,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const token = localStorage.getItem('auth_token');
     if (token) {
       try {
-        await fetch(`${API_BASE}/api/auth/signout`, {
+        await fetch(apiUrl('/api/auth/signout'), {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

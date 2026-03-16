@@ -44,6 +44,10 @@ console.log("Backend starting with allowed frontend origins =", configuredOrigin
 
 initDb();
 
+const isUniqueConstraintError = (error) =>
+  error?.code === "SQLITE_CONSTRAINT_UNIQUE" ||
+  String(error?.message || "").toUpperCase().includes("UNIQUE CONSTRAINT FAILED");
+
 const requireRole = (...roles) => (req, res, next) => {
   if (!req.auth?.user || !roles.includes(req.auth.user.role)) {
     return res.status(403).json({ error: "Forbidden" });
@@ -116,9 +120,10 @@ app.post("/api/auth/signup", (req, res) => {
       user,
     });
   } catch (error) {
-    if (String(error.message || "").includes("UNIQUE")) {
+    if (isUniqueConstraintError(error)) {
       return res.status(409).json({ error: "Email is already registered" });
     }
+    console.error("Signup error:", error);
     return res.status(500).json({ error: "Failed to create user" });
   }
 });
@@ -538,9 +543,10 @@ app.post("/api/admin/users", authMiddleware, requireRole("Admin"), (req, res) =>
     });
     res.status(201).json({ user: created });
   } catch (error) {
-    if (String(error.message || "").includes("UNIQUE")) {
+    if (isUniqueConstraintError(error)) {
       return res.status(409).json({ error: "Email is already registered" });
     }
+    console.error("Admin user creation error:", error);
     return res.status(500).json({ error: "Failed to create user" });
   }
 });
