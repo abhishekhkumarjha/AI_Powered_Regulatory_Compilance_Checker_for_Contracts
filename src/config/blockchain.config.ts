@@ -46,6 +46,8 @@ export const getRpcUrl = () => {
 };
 
 export const getConfiguredContractAddress = () => BLOCKCHAIN_CONFIG.contract.address;
+export const isMockBlockchainEnabled = () =>
+  (getConfiguredContractAddress() || '').trim().toLowerCase() === '0x0000000000000000000000000000000000000000';
 export const getConfiguredExplorerTxUrl = (txHash: string) =>
   BLOCKCHAIN_CONFIG.network.explorerUrl
     ? `${BLOCKCHAIN_CONFIG.network.explorerUrl.replace(/\/$/, '')}/tx/${txHash}`

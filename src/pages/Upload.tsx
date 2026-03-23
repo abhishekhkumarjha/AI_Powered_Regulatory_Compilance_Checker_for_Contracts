@@ -11,7 +11,7 @@ import {
   submitToBlockchain,
   isBlockchainRegistrationAvailable,
 } from '../services/blockchain';
-import { BLOCKCHAIN_CONFIG } from '../config/blockchain.config';
+import { BLOCKCHAIN_CONFIG, isMockBlockchainEnabled } from '../config/blockchain.config';
 import { analyzeContract, fileToBase64, saveBlockchainRecord } from '../services/gemini';
 
 const Upload: React.FC = () => {
@@ -22,6 +22,7 @@ const Upload: React.FC = () => {
   const [useBlockchain, setUseBlockchain] = useState(isBlockchainRegistrationAvailable());
   const navigate = useNavigate();
   const blockchainAvailable = isBlockchainRegistrationAvailable();
+  const mockBlockchainEnabled = isMockBlockchainEnabled();
   const networkName = BLOCKCHAIN_CONFIG.network.name;
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -67,8 +68,10 @@ const Upload: React.FC = () => {
 
       let blockchainResult: any = null;
       if (useBlockchain && blockchainAvailable) {
-        setStatus('connecting');
-        await connectWallet();
+        if (!mockBlockchainEnabled) {
+          setStatus('connecting');
+          await connectWallet();
+        }
         setStatus('blockchain');
         blockchainResult = await submitToBlockchain(hash);
       }
@@ -198,12 +201,15 @@ const Upload: React.FC = () => {
                 <h4 className="text-lg font-bold text-white mb-6">Processing Pipeline</h4>
                 <div className="space-y-6">
                   {[
-                    { id: 'hashing', label: 'Generating SHA-256 Hash', icon: ShieldCheck },
+                    { id: 'hashing', label: 'Generating keccak256 Hash', icon: ShieldCheck },
+                    ...(!mockBlockchainEnabled ? [{ id: 'connecting', label: `Connecting to ${networkName}`, icon: Loader2 }] : []),
+                    { id: 'blockchain', label: mockBlockchainEnabled ? 'Writing to Mock Blockchain' : `Registering on ${networkName}`, icon: Loader2 },
                     { id: 'analyzing', label: 'AI Compliance Analysis', icon: Loader2 },
                   ].map((step) => {
                     const isCurrent = status === step.id;
                     const isDone =
-                      (status === 'analyzing' && step.id === 'hashing') ||
+                      ['blockchain', 'analyzing', 'complete', 'error'].includes(status) && (step.id === 'hashing' || step.id === 'connecting') ||
+                      ['analyzing', 'complete', 'error'].includes(status) && step.id === 'blockchain' ||
                       status === 'complete' ||
                       status === 'error';
 
@@ -244,7 +250,7 @@ const Upload: React.FC = () => {
                   className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-emerald-500 focus:ring-emerald-500"
                 />
                 <span className={`text-sm ${blockchainAvailable ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                  Blockchain Registration ({networkName})
+                  {mockBlockchainEnabled ? 'Mock Blockchain Registration' : `Blockchain Registration (${networkName})`}
                 </span>
               </label>
               {!blockchainAvailable && (
@@ -288,7 +294,7 @@ const Upload: React.FC = () => {
           <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl flex gap-3">
             <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
             <p className="text-xs text-emerald-400 leading-relaxed">
-              Contract hashes are generated using keccak256 and can be optionally registered on-chain for tamper-evident proof.
+              Contract hashes are generated using keccak256 and can be {mockBlockchainEnabled ? 'recorded in the built-in mock blockchain' : 'optionally registered on-chain'} for tamper-evident proof.
             </p>
           </div>
         </div>

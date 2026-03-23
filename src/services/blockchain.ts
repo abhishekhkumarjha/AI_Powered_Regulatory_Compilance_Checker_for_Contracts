@@ -3,6 +3,7 @@ import {
   BLOCKCHAIN_CONFIG,
   getConfiguredContractAddress,
   getConfiguredExplorerTxUrl,
+  isMockBlockchainEnabled,
 } from '../config/blockchain.config';
 
 // Import mock service for zero-address configuration
@@ -85,14 +86,15 @@ const waitForReceipt = async (txHash: string): Promise<TransactionReceipt> => {
 };
 
 const getValidatedContractAddress = (): string | null => {
+  if (isMockBlockchainEnabled()) {
+    return ethers.ZeroAddress;
+  }
+
   const address = getConfiguredContractAddress()?.trim();
   if (!address) return null;
 
   try {
     const normalized = ethers.getAddress(address);
-    if (normalized === ethers.ZeroAddress) {
-      return null;
-    }
     return normalized;
   } catch {
     return null;
@@ -101,7 +103,6 @@ const getValidatedContractAddress = (): string | null => {
 
 export const isBlockchainRegistrationAvailable = (): boolean => {
   const address = getValidatedContractAddress();
-  // Always return true for mock blockchain (zero address)
   if (address === ethers.ZeroAddress) {
     return true;
   }
@@ -118,21 +119,21 @@ export const generateContractHash = async (file: File): Promise<string> => {
 };
 
 /**
- * Connect to MetaMask wallet
+ * Connect to the configured blockchain provider.
+ * In mock mode this returns a simulated wallet-like identity.
  */
 export const connectWallet = async (): Promise<WalletConnection> => {
   try {
-    // Check if using mock blockchain (zero address)
     const address = getValidatedContractAddress();
     if (address === ethers.ZeroAddress) {
-      // Return mock wallet connection
       const mockConnection = await mockBlockchain.connectWallet();
-      return {
+      walletConnection = {
         address: mockConnection.address,
         signer: null as any, // Mock signer
         provider: null as any, // Mock provider
         isConnected: true
       };
+      return walletConnection;
     }
 
     await ensureRpcAvailable();
@@ -305,6 +306,10 @@ export const submitToBlockchain = async (
 export const verifyOnBlockchain = async (contractHash: string): Promise<boolean> => {
   try {
     const contractAddress = getValidatedContractAddress();
+    if (contractAddress === ethers.ZeroAddress) {
+      return mockBlockchain.verifyOnBlockchain(contractHash);
+    }
+
     if (!contractAddress || !window.ethereum) {
       return false;
     }
