@@ -5,6 +5,9 @@ import {
   getConfiguredExplorerTxUrl,
 } from '../config/blockchain.config';
 
+// Import mock service for zero-address configuration
+import * as mockBlockchain from './blockchain-mock';
+
 // Types
 export interface WalletConnection {
   address: string;
@@ -97,7 +100,12 @@ const getValidatedContractAddress = (): string | null => {
 };
 
 export const isBlockchainRegistrationAvailable = (): boolean => {
-  return Boolean(getValidatedContractAddress());
+  const address = getValidatedContractAddress();
+  // Always return true for mock blockchain (zero address)
+  if (address === ethers.ZeroAddress) {
+    return true;
+  }
+  return Boolean(address);
 };
 
 /**
@@ -114,6 +122,19 @@ export const generateContractHash = async (file: File): Promise<string> => {
  */
 export const connectWallet = async (): Promise<WalletConnection> => {
   try {
+    // Check if using mock blockchain (zero address)
+    const address = getValidatedContractAddress();
+    if (address === ethers.ZeroAddress) {
+      // Return mock wallet connection
+      const mockConnection = await mockBlockchain.connectWallet();
+      return {
+        address: mockConnection.address,
+        signer: null as any, // Mock signer
+        provider: null as any, // Mock provider
+        isConnected: true
+      };
+    }
+
     await ensureRpcAvailable();
 
     if (!window.ethereum) {
@@ -216,14 +237,28 @@ export const submitToBlockchain = async (
   ipfsHash: string = ''
 ): Promise<BlockchainResult> => {
   try {
+    // Check if using mock blockchain (zero address)
+    const address = getValidatedContractAddress();
+    if (address === ethers.ZeroAddress) {
+      // Use mock blockchain submission
+      const mockResult = await mockBlockchain.submitToBlockchain(contractHash, ipfsHash);
+      return {
+        txId: mockResult.hash,
+        blockNumber: mockResult.blockNumber,
+        timestamp: new Date().toISOString(),
+        status: 'Confirmed' as const,
+        contractAddress: address,
+        explorerUrl: mockBlockchain.getExplorerUrl(mockResult.hash)
+      };
+    }
+
     await ensureRpcAvailable();
 
     if (!walletConnection) {
       throw new Error('Wallet not connected. Please connect your wallet first.');
     }
 
-    const contractAddress = getValidatedContractAddress();
-    if (!contractAddress) {
+    if (!address) {
       throw new Error(
         `Blockchain registration is not configured. Add VITE_CONTRACT_ADDRESS to enable ${BLOCKCHAIN_CONFIG.network.name} submission.`
       );
@@ -233,7 +268,7 @@ export const submitToBlockchain = async (
 
     // Create contract instance
     const contract = new Contract(
-      contractAddress,
+      address,
       BLOCKCHAIN_CONFIG.contract.abi,
       signer
     );
@@ -255,7 +290,7 @@ export const submitToBlockchain = async (
       blockNumber: receipt.blockNumber,
       timestamp: new Date().toISOString(),
       status: 'Confirmed',
-      contractAddress,
+      contractAddress: address,
       explorerUrl,
     };
   } catch (error) {

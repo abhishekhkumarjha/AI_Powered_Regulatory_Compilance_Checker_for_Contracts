@@ -20,8 +20,6 @@ const updateEnvFile = (filePath, address) => {
 };
 
 async function main() {
-  await hre.run("compile");
-
   const artifact = await hre.artifacts.readArtifact("ContractRegistry");
   const networkName = hre.network.name;
   const rpcUrl = networkName === "localhost"
