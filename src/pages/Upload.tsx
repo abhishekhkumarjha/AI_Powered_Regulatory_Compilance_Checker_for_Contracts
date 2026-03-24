@@ -250,7 +250,7 @@ const Upload: React.FC = () => {
                   className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-emerald-500 focus:ring-emerald-500"
                 />
                 <span className={`text-sm ${blockchainAvailable ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                  {mockBlockchainEnabled ? 'Mock Blockchain Registration' : `Blockchain Registration (${networkName})`}
+                  {mockBlockchainEnabled ? 'Blockchain Registration' : `Blockchain Registration (${networkName})`}
                 </span>
               </label>
               {!blockchainAvailable && (
