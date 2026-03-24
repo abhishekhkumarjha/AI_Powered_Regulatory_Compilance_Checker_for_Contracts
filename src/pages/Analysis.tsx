@@ -31,6 +31,74 @@ const DEFAULT_STATE: WorkspaceState = {
 
 const REVIEWERS = ['Priya Shah', 'Arjun Mehta', 'Nisha Kapoor'];
 
+const getIssueTone = (status: string) => {
+  const normalized = String(status || '').toLowerCase();
+
+  if (normalized === 'compliant') {
+    return {
+      badge: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+      panel: 'border-emerald-500/20 bg-emerald-500/5',
+      recommendation: 'text-emerald-200',
+    };
+  }
+
+  if (normalized === 'missing' || normalized === 'non-compliant') {
+    return {
+      badge: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
+      panel: 'border-rose-500/20 bg-rose-500/5',
+      recommendation: 'text-rose-200',
+    };
+  }
+
+  return {
+    badge: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+    panel: 'border-amber-500/20 bg-amber-500/5',
+    recommendation: 'text-amber-100',
+  };
+};
+
+const getComplianceTone = (status: string) => {
+  const normalized = String(status || '').toLowerCase();
+
+  if (normalized === 'compliant') {
+    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+  }
+
+  if (normalized.includes('review') || normalized === 'warning') {
+    return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
+  }
+
+  if (normalized.includes('non-compliant')) {
+    return 'border-rose-500/30 bg-rose-500/10 text-rose-300';
+  }
+
+  return 'border-sky-500/30 bg-sky-500/10 text-sky-300';
+};
+
+const getRiskTone = (score: number) => {
+  if (score >= 70) return 'border-rose-500/30 bg-rose-500/10 text-rose-300';
+  if (score >= 40) return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
+  return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+};
+
+const getBlockchainTone = (status: string) => {
+  const normalized = String(status || '').toLowerCase();
+
+  if (normalized === 'confirmed') {
+    return 'text-sky-300';
+  }
+
+  if (normalized === 'not registered' || normalized === 'local only') {
+    return 'text-zinc-300';
+  }
+
+  if (normalized === 'failed') {
+    return 'text-rose-300';
+  }
+
+  return 'text-amber-300';
+};
+
 const Analysis: React.FC = () => {
   const [data, setData] = useState<any>(null);
   const [panel, setPanel] = useState<Panel>(null);
@@ -153,6 +221,8 @@ const Analysis: React.FC = () => {
   const flagged = issues.filter((issue: any) => issue.status !== 'Compliant');
   const manualChecklist = flagged.map((issue: any) => issue.recommendation || `Review ${issue.clause}`);
   const aiDraft = workspace.aiDraft || buildAiDraft(fileName, flagged);
+  const complianceTone = getComplianceTone(analysis?.complianceStatus || 'Unknown');
+  const riskTone = getRiskTone(Number(analysis?.overallRiskScore ?? 0));
 
   const logAction = (entry: string) => {
     setMessageTone('success');
@@ -222,7 +292,7 @@ const Analysis: React.FC = () => {
       <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-bold uppercase tracking-widest rounded-full border border-emerald-500/20">{workspace.status}</span>
+            <span className="px-3 py-1 bg-cyan-500/10 text-cyan-300 text-[10px] font-bold uppercase tracking-widest rounded-full border border-cyan-500/20">{workspace.status}</span>
             <span className="text-zinc-500 text-sm">{new Date().toLocaleDateString()}</span>
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">{fileName}</h1>
@@ -233,7 +303,7 @@ const Analysis: React.FC = () => {
             Export Report
           </button>
           <button
-            className="px-4 py-2 bg-zinc-900 border border-emerald-500/40 rounded-xl text-sm font-bold text-emerald-400 hover:bg-zinc-800 flex items-center gap-2"
+            className="px-4 py-2 bg-zinc-900 border border-cyan-500/40 rounded-xl text-sm font-bold text-cyan-300 hover:bg-zinc-800 flex items-center gap-2"
             onClick={async () => {
               setBusyAction('share');
               try {
@@ -260,7 +330,7 @@ const Analysis: React.FC = () => {
             {busyAction === 'share' ? 'Sharing...' : 'Share Analysis'}
           </button>
           <button
-            className="px-4 py-2 bg-emerald-500 rounded-xl text-sm font-bold text-black hover:bg-emerald-400"
+            className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-xl text-sm font-bold text-slate-950 hover:from-cyan-300 hover:to-emerald-300"
             onClick={async () => {
               setBusyAction('status');
               const next = user?.role === 'Client'
@@ -328,9 +398,9 @@ const Analysis: React.FC = () => {
           <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-8">
             <h3 className="text-xl font-bold text-white mb-6">Compliance Overview</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <MetaCard label="Status" value={analysis?.complianceStatus || 'Unknown'} icon={<Info className="w-4 h-4" />} />
-              <MetaCard label="Risk Score" value={`${analysis?.overallRiskScore ?? 0}/100`} icon={<ShieldCheck className="w-4 h-4" />} />
-              <MetaCard label="Clauses" value={String(issues.length)} icon={<CheckCircle2 className="w-4 h-4" />} />
+              <MetaCard label="Status" value={analysis?.complianceStatus || 'Unknown'} icon={<Info className="w-4 h-4" />} toneClass={complianceTone} />
+              <MetaCard label="Risk Score" value={`${analysis?.overallRiskScore ?? 0}/100`} icon={<ShieldCheck className="w-4 h-4" />} toneClass={riskTone} />
+              <MetaCard label="Clauses" value={String(issues.length)} icon={<CheckCircle2 className="w-4 h-4" />} toneClass="border-violet-500/30 bg-violet-500/10 text-violet-300" />
             </div>
             {analysis?.summary && <p className="mt-6 text-sm text-zinc-300 leading-relaxed">{analysis.summary}</p>}
           </div>
@@ -339,16 +409,18 @@ const Analysis: React.FC = () => {
             <h3 className="text-xl font-bold text-white mb-6">Detailed Findings</h3>
             <div className="space-y-4">
               {issues.length === 0 && <p className="text-sm text-zinc-400">No clause-level findings were returned.</p>}
-              {issues.map((issue: any, index: number) => (
-                <div key={`${issue.clause}-${index}`} className="rounded-2xl border border-white/10 bg-black/20 p-5">
+              {issues.map((issue: any, index: number) => {
+                const tone = getIssueTone(issue.status);
+                return (
+                <div key={`${issue.clause}-${index}`} className={`rounded-2xl border p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] ${tone.panel}`}>
                   <div className="flex items-center justify-between gap-4">
                     <h4 className="text-white font-bold">{issue.clause}</h4>
-                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">{issue.status}</span>
+                    <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${tone.badge}`}>{issue.status}</span>
                   </div>
-                  <p className="mt-2 text-sm text-zinc-400">{issue.description}</p>
-                  {issue.recommendation && <p className="mt-3 text-sm text-emerald-300">Recommendation: {issue.recommendation}</p>}
+                  <p className="mt-2 text-sm text-zinc-300">{issue.description}</p>
+                  {issue.recommendation && <p className={`mt-3 text-sm ${tone.recommendation}`}>Recommendation: {issue.recommendation}</p>}
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         </div>
@@ -375,9 +447,9 @@ const Analysis: React.FC = () => {
                 </button>
               </div>
               <p className="font-mono text-[11px] break-all text-zinc-300">{blockchain.hash}</p>
-              <p className="text-zinc-400">Status: <span className="text-emerald-400">{blockchain.status}</span></p>
+              <p className="text-zinc-400">Status: <span className={getBlockchainTone(blockchain.status)}>{blockchain.status}</span></p>
               {blockchain.explorerUrl && blockchain.explorerUrl !== '#' && (
-                <a href={blockchain.explorerUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300">
+                <a href={blockchain.explorerUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-200">
                   View on Explorer
                   <ExternalLink className="w-3 h-3" />
                 </a>
@@ -395,8 +467,8 @@ const Analysis: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-3xl p-6">
-            <h4 className="text-sm font-bold text-emerald-500 uppercase tracking-wider mb-4">Suggested Actions</h4>
+          <div className="bg-gradient-to-br from-cyan-500/8 via-zinc-900/70 to-violet-500/8 border border-cyan-500/10 rounded-3xl p-6">
+            <h4 className="text-sm font-bold text-cyan-300 uppercase tracking-wider mb-4">Suggested Actions</h4>
             <div className="space-y-3">
               {user?.role === 'Legal Reviewer' && (
                 <>
@@ -417,14 +489,14 @@ const Analysis: React.FC = () => {
             </div>
 
             {panel === 'note' && (
-              <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-black/20 p-4 space-y-3">
+              <div className="mt-4 rounded-2xl border border-cyan-500/20 bg-black/20 p-4 space-y-3">
                 <textarea
                   value={workspace.note}
                   onChange={(event) => setWorkspace((current) => ({ ...current, note: event.target.value }))}
                   placeholder="Add a practical legal review note..."
-                  className="w-full min-h-28 rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-zinc-200 outline-none focus:border-emerald-500"
+                  className="w-full min-h-28 rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-zinc-200 outline-none focus:border-cyan-400"
                 />
-                <button className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-black hover:bg-emerald-400" onClick={() => {
+                <button className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-cyan-300" onClick={() => {
                   if (!workspace.note.trim()) return showError('Write a note before saving.');
                   logAction('Legal note saved.');
                 }}>
@@ -434,16 +506,16 @@ const Analysis: React.FC = () => {
             )}
 
             {panel === 'assign' && (
-              <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-black/20 p-4 space-y-3">
+              <div className="mt-4 rounded-2xl border border-cyan-500/20 bg-black/20 p-4 space-y-3">
                 <select
                   value={workspace.assignee}
                   onChange={(event) => setWorkspace((current) => ({ ...current, assignee: event.target.value }))}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-zinc-200 outline-none focus:border-emerald-500"
+                  className="w-full rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-zinc-200 outline-none focus:border-cyan-400"
                 >
                   <option value="">Select a senior partner</option>
                   {REVIEWERS.map((reviewer) => <option key={reviewer} value={reviewer}>{reviewer}</option>)}
                 </select>
-                <button className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-black hover:bg-emerald-400" onClick={() => {
+                <button className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-cyan-300" onClick={() => {
                   if (!workspace.assignee) return showError('Select a reviewer first.');
                   logAction(`Assigned to ${workspace.assignee}.`);
                 }}>
@@ -453,12 +525,12 @@ const Analysis: React.FC = () => {
             )}
 
             {panel === 'manual' && (
-              <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-black/20 p-4 space-y-3">
+              <div className="mt-4 rounded-2xl border border-amber-500/20 bg-black/20 p-4 space-y-3">
                 {manualChecklist.length === 0 && <p className="text-sm text-zinc-400">No manual amendments suggested.</p>}
                 {manualChecklist.map((item: string) => {
                   const checked = workspace.manualItems.includes(item);
                   return (
-                    <label key={item} className={`flex items-start gap-3 rounded-xl border p-3 text-sm ${checked ? 'border-emerald-500/40 bg-emerald-500/10 text-white' : 'border-white/10 bg-zinc-950 text-zinc-300'}`}>
+                    <label key={item} className={`flex items-start gap-3 rounded-xl border p-3 text-sm ${checked ? 'border-amber-500/40 bg-amber-500/10 text-white' : 'border-white/10 bg-zinc-950 text-zinc-300'}`}>
                       <input
                         type="checkbox"
                         checked={checked}
@@ -472,7 +544,7 @@ const Analysis: React.FC = () => {
                     </label>
                   );
                 })}
-                <button className="rounded-xl border border-emerald-500/30 px-4 py-2 text-sm font-bold text-emerald-300 hover:bg-emerald-500/10" onClick={async () => {
+                <button className="rounded-xl border border-amber-500/30 px-4 py-2 text-sm font-bold text-amber-300 hover:bg-amber-500/10" onClick={async () => {
                   const items = workspace.manualItems.length ? workspace.manualItems : manualChecklist;
                   try {
                     await copyText(items.join('\n'));
@@ -487,20 +559,20 @@ const Analysis: React.FC = () => {
             )}
 
             {panel === 'ai' && (
-              <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-black/20 p-4 space-y-3">
+              <div className="mt-4 rounded-2xl border border-violet-500/20 bg-black/20 p-4 space-y-3">
                 <textarea
                   value={aiDraft}
                   onChange={(event) => setWorkspace((current) => ({ ...current, aiDraft: event.target.value }))}
-                  className="w-full min-h-52 rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-zinc-200 outline-none focus:border-emerald-500"
+                  className="w-full min-h-52 rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-zinc-200 outline-none focus:border-violet-400"
                 />
                 <div className="flex gap-2">
-                  <button className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-black hover:bg-emerald-400" onClick={() => {
+                  <button className="rounded-xl bg-violet-400 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-violet-300" onClick={() => {
                     setWorkspace((current) => ({ ...current, aiDraft: buildAiDraft(fileName, flagged) }));
                     logAction('AI amendment draft refreshed.');
                   }}>
                     Refresh Draft
                   </button>
-                  <button className="rounded-xl border border-emerald-500/30 px-4 py-2 text-sm font-bold text-emerald-300 hover:bg-emerald-500/10" onClick={async () => {
+                  <button className="rounded-xl border border-violet-500/30 px-4 py-2 text-sm font-bold text-violet-300 hover:bg-violet-500/10" onClick={async () => {
                     try {
                       await copyText(aiDraft);
                       logAction('AI amendment draft copied.');
@@ -515,7 +587,7 @@ const Analysis: React.FC = () => {
             )}
 
             {panel === 'audit' && (
-              <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-black/20 p-4 space-y-3">
+              <div className="mt-4 rounded-2xl border border-cyan-500/20 bg-black/20 p-4 space-y-3">
                 {workspace.audit.length === 0 && <p className="text-sm text-zinc-400">No actions recorded yet.</p>}
                 {workspace.audit.map((entry) => (
                   <div key={entry} className="rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-zinc-300">{entry}</div>
@@ -531,17 +603,17 @@ const Analysis: React.FC = () => {
 
 function ActionButton({ label, icon, active = false, onClick }: { label: string; icon: React.ReactNode; active?: boolean; onClick: () => void }) {
   return (
-    <button className={`group w-full flex items-center justify-between p-3 rounded-xl ${active ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-white/5 hover:bg-white/10 border border-transparent'}`} onClick={onClick}>
+    <button className={`group w-full flex items-center justify-between p-3 rounded-xl ${active ? 'bg-cyan-500/10 border border-cyan-500/30' : 'bg-white/5 hover:bg-white/10 border border-transparent'}`} onClick={onClick}>
       <span className="text-sm text-zinc-300">{label}</span>
-      <span className="text-zinc-500">{icon}</span>
+      <span className={`${active ? 'text-cyan-300' : 'text-zinc-500'}`}>{icon}</span>
     </button>
   );
 }
 
-function MetaCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+function MetaCard({ label, value, icon, toneClass }: { label: string; value: string; icon: React.ReactNode; toneClass: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-      <div className="flex items-center gap-2 text-zinc-500 text-xs uppercase tracking-wider">
+    <div className={`rounded-2xl border p-4 ${toneClass}`}>
+      <div className="flex items-center gap-2 text-xs uppercase tracking-wider opacity-90">
         {icon}
         {label}
       </div>
