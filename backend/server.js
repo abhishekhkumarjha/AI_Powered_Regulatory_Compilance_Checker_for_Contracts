@@ -14,7 +14,6 @@ import {
   signInUser,
 } from "./auth.js";
 import { analyzeWithLocalModel } from "./pythonAnalyzer.js";
-import { analyzeWithGemini } from "./gemini.js";
 
 const app = express();
 const port = Number(process.env.PORT || process.env.BACKEND_PORT || 4000);
@@ -290,18 +289,11 @@ app.post("/api/contracts/:id/analysis", authMiddleware, async (req, res) => {
   }
 
   try {
-    let analysis;
-
-    try {
-      analysis = await analyzeWithLocalModel({
-        text,
-        fileName,
-        fileContentBase64,
-      });
-    } catch (localModelError) {
-      console.error("Local model analysis failed, falling back to Gemini:", localModelError);
-      analysis = await analyzeWithGemini(text || fileName || "Uploaded contract");
-    }
+    const analysis = await analyzeWithLocalModel({
+      text,
+      fileName,
+      fileContentBase64,
+    });
 
     const analysisId = crypto.randomUUID();
     const now = new Date().toISOString();

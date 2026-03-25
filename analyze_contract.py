@@ -3,9 +3,15 @@ import os
 from io import BytesIO
 from typing import Dict, List, Optional, Tuple
 
-import torch
-import torch.nn.functional as F
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+try:
+    import torch
+    import torch.nn.functional as F
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+except Exception:  # pragma: no cover - allow heuristic fallback when ML deps fail
+    torch = None
+    F = None
+    AutoModelForSequenceClassification = None
+    AutoTokenizer = None
 
 
 MODEL_PATH = "distilbert-base-uncased-finetuned-sst-2-english"
@@ -23,14 +29,33 @@ class ContractAnalyzer:
         self.label_map = label_map or DEFAULT_LABEL_MAP
         self.tokenizer = None
         self.model = None
+        self.model_available = False
+        self.model_error = None
 
     def _load_model(self) -> None:
-        if self.tokenizer is not None and self.model is not None:
+        if self.model_available and self.tokenizer is not None and self.model is not None:
             return
 
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
-        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_path)
-        self.model.eval()
+        if AutoTokenizer is None or AutoModelForSequenceClassification is None or torch is None or F is None:
+            self.model_error = "transformer runtime unavailable"
+            self.model_available = False
+            return
+
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+            self.model = AutoModelForSequenceClassification.from_pretrained(self.model_path)
+            self.model.eval()
+            label_count = int(getattr(self.model.config, "num_labels", 0) or 0)
+            self.model_available = label_count == len(self.label_map)
+            if not self.model_available:
+                self.model_error = (
+                    f"model label mismatch: expected {len(self.label_map)} labels, got {label_count}"
+                )
+        except Exception as exc:
+            self.model_error = str(exc)
+            self.model_available = False
+            self.tokenizer = None
+            self.model = None
 
     def analyze_text(self, contract_text: str) -> Dict:
         clauses = _split_into_clauses(contract_text)
@@ -39,7 +64,7 @@ class ContractAnalyzer:
         for clause in clauses:
             category = _detect_category(clause)
             regulations = _detect_regulations(clause)
-            compliance_status, _conf = self.predict_compliance(clause)
+            compliance_status, _conf = self.predict_compliance(clause, category)
             risk_level = _assess_risk(clause, category, compliance_status)
             issue, recommended_clause = _issue_and_recommendation(
                 clause, category, regulations, compliance_status, risk_level
@@ -87,8 +112,11 @@ class ContractAnalyzer:
         contract_text = extract_text_from_file_path(path)
         return self.analyze_text(contract_text)
 
-    def predict_compliance(self, clause: str) -> Tuple[str, float]:
+    def predict_compliance(self, clause: str, category: str = "") -> Tuple[str, float]:
         self._load_model()
+        if not self.model_available or self.tokenizer is None or self.model is None:
+            return _predict_compliance_heuristic(clause, category)
+
         inputs = self.tokenizer(clause, return_tensors="pt", truncation=True, padding=True)
 
         with torch.no_grad():
@@ -98,6 +126,8 @@ class ContractAnalyzer:
         prediction = int(torch.argmax(probs, dim=1).item())
         confidence = float(probs.max().item())
         compliance_status = self.label_map.get(prediction, "UNKNOWN")
+        if compliance_status == "UNKNOWN":
+            return _predict_compliance_heuristic(clause, category)
         return compliance_status, confidence
 
 
@@ -341,6 +371,68 @@ def _detect_missing_clauses(clause_summaries: List[Dict]) -> List[str]:
             missing.append(description)
 
     return missing
+
+
+def _predict_compliance_heuristic(clause: str, category: str) -> Tuple[str, float]:
+    text = clause.lower()
+
+    strong_controls = [
+        "shall", "must", "within", "days", "hours", "encrypt", "encryption",
+        "delete", "erasure", "notify", "consent", "access", "rectification",
+        "retention period", "data processing agreement", "appropriate technical",
+        "organisational measures", "limited to", "solely for", "lawful basis",
+    ]
+    vague_terms = [
+        "may", "as needed", "from time to time", "reasonable efforts",
+        "where appropriate", "if practicable", "as soon as possible",
+        "including but not limited to",
+    ]
+
+    if any(term in text for term in vague_terms):
+        return "AMBIGUOUS", 0.51
+
+    if category == "Data Retention":
+        if any(term in text for term in ["years", "months", "days", "retain only", "retention period"]):
+            return "COMPLIANT", 0.79
+        return "NON-COMPLIANT", 0.76
+
+    if category == "User Consent":
+        if any(term in text for term in ["explicit consent", "prior consent", "withdraw consent", "opt-out", "opt out"]):
+            return "COMPLIANT", 0.8
+        return "NON-COMPLIANT", 0.77
+
+    if category == "Data Sharing":
+        if any(term in text for term in ["third party agreement", "solely for", "only as necessary", "subprocessor agreement"]):
+            return "COMPLIANT", 0.77
+        return "RISKY", 0.66
+
+    if category == "Security Measures":
+        if any(term in text for term in ["encrypt", "access control", "audit", "security measures", "technical and organisational"]):
+            return "COMPLIANT", 0.82
+        return "NON-COMPLIANT", 0.78
+
+    if category == "Breach Notification":
+        if "notify" in text and any(term in text for term in ["24 hours", "48 hours", "72 hours", "without undue delay"]):
+            return "COMPLIANT", 0.81
+        return "NON-COMPLIANT", 0.79
+
+    if category == "User Rights":
+        if any(term in text for term in ["access", "rectification", "erasure", "deletion", "portability", "objection"]):
+            return "COMPLIANT", 0.79
+        return "NON-COMPLIANT", 0.75
+
+    if category == "Data Processing":
+        if any(term in text for term in ["specified purpose", "legitimate purpose", "limited to", "solely for"]):
+            return "COMPLIANT", 0.74
+        return "RISKY", 0.63
+
+    if len(text.split()) < 8:
+        return "AMBIGUOUS", 0.54
+
+    if any(term in text for term in strong_controls):
+        return "COMPLIANT", 0.68
+
+    return "RISKY", 0.6
 
 
 def analyze_contract_text(contract_text: str) -> Dict:
