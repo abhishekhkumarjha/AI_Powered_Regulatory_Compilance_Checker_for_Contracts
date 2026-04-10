@@ -81,12 +81,17 @@ app.use(
 
       return callback(new Error("Not allowed by CORS"));
     },
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
 app.use(express.json({ limit: "35mb" }));
+
+app.head("/api/uptime", (_req,res) => {
+  res.sendStatus(200);
+});
+
 
 app.get("/api/health", (_req, res) => {
   res.json({
